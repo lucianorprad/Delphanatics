@@ -1,0 +1,42 @@
+--> VALIDAR SE A CONEXÃO É VÁLIDA (ORIGEM E DESTINO)
+
+function fTestarConexao(AConn: TFDConnection): Boolean;
+begin
+  AConn.Close() ;
+  AConn.Open();
+  Result := True ;
+end;
+
+procedure pTestarOrigem(Sender: TObject);
+begin
+  pConfiguraConexao(dmConexao.ConexaoOrigem,
+                    edtBancoDados.Text,
+                    edtUsuario.Text,
+                    edtSenha.Text,
+                    edtPorta.Text,
+                    EdtEndereco.Text) ;
+
+  if fTestarConexao(dmConexao.ConexaoOrigem) then
+    ShowMessage('Sucesso!');
+end;
+
+//fazer o mesmo pra "testar" destino
+
+
+--> VALIDAR A BASE DE CNPJ PRA COPIAR CFG_CITUSU ...
+procedure pValidaBaseCnpj(const cnpjOrigem , cnpjDestino: string);
+begin
+  if Copy(cnpjOrigem, 1,8) = copy(cnpjDestino,1,8) then
+  begin
+    // copia as cfgs
+
+  end
+  else
+  begin
+  // não copia
+  end
+  ;
+end;
+
+
+
