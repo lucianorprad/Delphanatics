@@ -1,1 +1,110 @@
+library DatabaseManager;
 
+uses
+  SysUtils,
+  Classes,
+  IniFiles,
+  FireDAC.Comp.Client,
+  Vcl.Dialogs,
+  FireDAC.Stan.Intf,
+  FireDAC.Stan.Option,
+  FireDAC.Stan.Error,
+  FireDAC.UI.Intf,
+  FireDAC.Phys.Intf,
+  FireDAC.Stan.Def,
+  FireDAC.Stan.Pool,
+  FireDAC.Stan.Async,
+  FireDAC.Phys,
+  FireDAC.Phys.MySQL,
+  FireDAC.Phys.MySQLDef,
+  FireDAC.VCLUI.Wait,
+  Data.DB,
+  Vcl.Controls;
+
+{$R *.res}
+
+// Processa o arquivo.ini Cria o TFDConnection a partir dos parametros passados
+// e insere a conexao na TStringList
+function fCreateConnectionFromIniFile(const AstrIniFileName: String): TStringList; stdcall;
+var
+  LIniFile: TIniFile;
+  LSectionList: TStringList;
+  I: Integer;
+  LConnection: TFDConnection;
+  LSectionName, LServer, LDatabase, LUserName, LPassword, LPort: string;
+begin
+  Result := TStringList.Create;
+  LIniFile := nil;
+  LSectionList := nil;
+
+  try
+    if not FileExists(AstrIniFileName) then
+      raise Exception.Create('O arquivo INI especificado não existe.');
+
+    LIniFile := TIniFile.Create(AstrIniFileName);
+    LSectionList := TStringList.Create;
+    LIniFile.ReadSections(LSectionList);
+
+    for I := 0 to LSectionList.Count - 1 do
+    begin
+      LSectionName := LSectionList[I];
+      LServer := LIniFile.ReadString(LSectionName, 'Server', '');
+      LDatabase := LIniFile.ReadString(LSectionName, 'DataBase', '');
+      LUserName := LIniFile.ReadString(LSectionName, 'UserName', '');
+      LPassword := LIniFile.ReadString(LSectionName, 'Password', '');
+      LPort := LIniFile.ReadString(LSectionName, 'Port', '');
+
+      LConnection := TFDConnection.Create(nil);
+      LConnection.Params.DriverID := 'MySQL';
+      LConnection.Params.Database := LDatabase;
+      LConnection.Params.UserName := LUserName;
+      LConnection.Params.Password := LPassword;
+      LConnection.Params.Add('Server=' + LServer);
+      LConnection.Params.Add('Port=' + LPort);
+
+      try
+        LConnection.Open;
+        Result.AddObject(LSectionName, LConnection);
+        ShowMessage('Conexão ' + LSectionName + ' criada com sucesso!');
+      except
+        on E: Exception do
+        begin
+          ShowMessage('Erro ao criar conexão ' + LSectionName + ': ' + E.Message);
+          LConnection.Free;
+          FreeAndNil(Result);
+          Exit; // Saia da função em caso de erro.
+        end;
+      end;
+    end;
+  finally
+    FreeAndNil(LIniFile);
+    FreeAndNil(LSectionList);
+  end;
+end;
+
+// Processa a TStringList e atraves de um looping ativa todas as TFDConnection
+procedure pActivateConnections(AconnectionList: TStringList);
+var
+  I: Integer;
+begin
+  for I := 0 to AconnectionList.Count - 1 do
+  begin
+    if AconnectionList.Objects[I] is TFDConnection then
+    begin
+      try
+        TFDConnection(AconnectionList.Objects[I]).Open;
+        ShowMessage('Conexão ' + AconnectionList[I] + ' ativada com sucesso!');
+      except
+        on E: Exception do
+          ShowMessage('Erro ao ativar conexão ' + AconnectionList[I] + ': ' + E.Message);
+      end;
+    end;
+  end;
+end;
+
+exports
+  fCreateConnectionFromIniFile,
+  pActivateConnections;
+
+begin
+end.
