@@ -1,3 +1,32 @@
+//valida ao marcar CFGSIS para preencher cfg que não podem ser copiadas
+//podemos fazer as demais assim
+
+procedure TFrmAgendaReplicar.CFGSISClick(Sender: TObject);
+var
+  CFG_CIEEST, CFG_REDEST, CFG_CIELNK: string ;
+
+begin
+  if CFGSIS.Checked then
+  begin
+    CFG_CIEEST:= InputBox('Informe CFG_CIEEST', 'Por favor , informe o valor da CFG_CIEEST:','');
+    CFG_REDEST:= InputBox('Informe CFG_REDEST','Por favor informe o valor da CFG_REDEST:','' );
+    CFG_CIELNK:= InputBox('Informe CFG_CIELNK','Por favor Informe o valor da CFG_CIELNK','');
+
+    if (Trim(CFG_CIEEST) = '') OR (trim(CFG_REDEST) =  '') or (trim(CFG_CIELNK) ='' ) then
+    begin
+      ShowMessage('É necessário preencher as configurações solicitadas anteriormente!' );
+      CFGSIS.Checked:= False; // pra desmarcar o check box
+    end
+    else
+    begin
+      ShowMessage('CFG salvas com sucesso !');
+    end;
+
+    ;
+  end;
+
+
+
 --> VALIDAR SE A CONEXÃO É VÁLIDA (ORIGEM E DESTINO)
 
 function fTestarConexao(AConn: TFDConnection): Boolean;
