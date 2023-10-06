@@ -1,5 +1,7 @@
 library DatabaseManager;
 
+
+
 uses
   SysUtils,
   Classes,
@@ -22,6 +24,7 @@ uses
   Vcl.Controls;
 
 {$R *.res}
+
 
 // Processa o arquivo.ini Cria o TFDConnection a partir dos parametros passados
 // e insere a conexao na TStringList
@@ -47,12 +50,18 @@ begin
 
     for I := 0 to LSectionList.Count - 1 do
     begin
-      LSectionName := LSectionList[I];
-      LServer := LIniFile.ReadString(LSectionName, 'Server', '');
-      LDatabase := LIniFile.ReadString(LSectionName, 'DataBase', '');
-      LUserName := LIniFile.ReadString(LSectionName, 'UserName', '');
-      LPassword := LIniFile.ReadString(LSectionName, 'Password', '');
-      LPort := LIniFile.ReadString(LSectionName, 'Port', '');
+      try
+        LSectionName := LSectionList[I];
+        LServer := LIniFile.ReadString(LSectionName, 'Server', '');
+        LDatabase := LIniFile.ReadString(LSectionName, 'DataBase', '');
+        LUserName := LIniFile.ReadString(LSectionName, 'UserName', '');
+        LPassword := LIniFile.ReadString(LSectionName, 'Password', '');
+        LPort := LIniFile.ReadString(LSectionName, 'Port', '');
+      except
+        ShowMessage('Verifique se as chaves estão corretas na seção '+LSectionName+' e teste novamente!');
+        Exit;
+      end;
+
 
       LConnection := TFDConnection.Create(nil);
       LConnection.Params.DriverID := 'MySQL';
@@ -83,7 +92,7 @@ begin
 end;
 
 // Processa a TStringList e atraves de um looping ativa todas as TFDConnection
-procedure pActivateConnections(AconnectionList: TStringList);
+procedure pActivateConnections(AconnectionList: TStringList); stdcall;
 var
   I: Integer;
 begin
