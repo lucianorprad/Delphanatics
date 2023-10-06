@@ -1,0 +1,338 @@
+library MemoManager;
+
+// nessa dll temos algumas funções para tratar o componete TMemo, onde vai ser inserido os parametros para conexão com o banco de dados
+
+uses
+  SysUtils,
+  Classes,
+  Dialogs,
+  IniFiles,
+  Vcl.StdCtrls,
+  Windows;
+
+{$R *.res}
+
+//encontra o caminho da dll
+function fGetDllPath: string; stdcall;
+var
+  ModuleHandle: HMODULE;
+begin
+  ModuleHandle := GetModuleHandle(nil);
+  SetLength(Result, MAX_PATH);
+  SetLength(Result, GetModuleFileName(ModuleHandle, PChar(Result), Length(Result)));
+  Result := ExtractFilePath(Result);
+end;
+
+function fContarSecoesNoMemo(Memo : TMemo): Integer; stdcall;
+var
+  I : Integer;
+begin
+  Result := 0;
+  for I := 0 to Memo.Lines.Count -1 do
+  begin
+    if (Trim(Memo.Lines[I]) <> '') and (Memo.Lines[I][1] = '[') then
+      Inc(Result);
+  end;
+end;
+
+function fSecaoExisteNoMemo(Memo : TMemo; const AstrNomeSecao : String): Boolean; stdcall;
+var
+  I : Integer;
+begin
+  Result := False;
+  for I := 0 to Memo.Lines.Count - 1 do
+  begin
+    if (Trim(Memo.Lines[I]) <> '') and (Memo.Lines[I][1] = '[') then
+    begin
+      if SameText('[' + AstrNomeSecao + ']', Memo.Lines[I]) then
+      begin
+        Result := True;
+        Break;
+      end;
+    end;
+  end;
+end;
+
+
+
+procedure pAdicionarSecaoNoMemo(Memo : TMemo; AintMaximoSecoes : integer); stdcall;
+var
+  LstrNomeSecao : String;
+begin
+  // verifica quantas seções ja existem no Memo
+  if fContarSecoesNoMemo(Memo) >= AintMaximoSecoes then
+  begin
+    ShowMessage('Você ja adicionou o máximo de 5 seções.');
+    Exit;
+  end;
+
+  // Pergunta ao usuario o nome da nova seção
+  repeat
+    LstrNomeSecao := inputbox('Nova Seção', 'Digite o nome da seção:', '');
+    // verifica se o nome da seção ja existe
+    if fSecaoExisteNoMemo(Memo, LstrNomeSecao) = True then
+    begin
+      ShowMessage('O nome da seção "' + LstrNomeSecao + '" já existe. Escolha outro nome.');
+    end
+    else
+    begin
+      // Adicione uma nova seção ao Memo
+      Memo.Lines.Add('[' + LstrNomeSecao + ']');
+      Memo.Lines.Add('Server=');
+      Memo.Lines.Add('Database=');
+      Memo.Lines.Add('UserName=');
+      Memo.Lines.Add('Password=');
+      Memo.Lines.Add('Port=');
+      Exit;
+    end;
+  until LstrNomeSecao = '';
+end;
+
+function fParametrosEstaoCompletos(const Memo: TMemo): TStringList; stdcall;
+var
+  I: Integer;
+  LstrLinha, LstrValor: string;
+  CamposEmFalta: TStringList;
+begin
+  Result := TStringList.Create;
+  CamposEmFalta := TStringList.Create;
+  try
+    for I := 0 to Memo.Lines.Count - 1 do
+    begin
+      LstrLinha := Memo.Lines[I];
+
+      // Verifique se a linha não está em branco e contém um sinal de igual
+      if (Trim(LstrLinha) <> '') and (Pos('=', LstrLinha) > 0) then
+      begin
+        LstrValor := Trim(Copy(LstrLinha, Pos('=', LstrLinha) + 1, Length(LstrLinha)));
+
+        // Verifique se a linha é a senha (Password) e se não há valor após o sinal de igual
+        if (Pos('Password=', LstrLinha) > 0) and (LstrValor = '') then
+        begin
+          // A senha (Password) pode estar vazia, não faz nada neste caso
+        end
+        else if LstrValor = '' then
+        begin
+          CamposEmFalta.Add(Copy(LstrLinha, 1, Pos('=', LstrLinha) - 1));
+        end;
+      end;
+    end;
+
+    // Copie os nomes dos campos em falta para o resultado
+    Result.Assign(CamposEmFalta);
+  finally
+    CamposEmFalta.Free;
+  end;
+end;
+
+function fCriarArquivoIniDoMemo(const Memo: TMemo; const AnomeArquivoIni: string): Boolean; stdcall;
+var
+  LIniFile: TIniFile;
+  I: Integer;
+  LstrLinha, LstrSection, LstrExePath, LstrINIPath: string;
+  LstrKey, LstrValue: string;
+begin
+  LIniFile := nil; // Inicializa a variável como nil
+
+  // Obtenha o caminho da pasta onde o executável principal está localizado
+  LstrExePath := ExtractFilePath(ParamStr(0));
+
+  // Construa o caminho completo para o arquivo INI na mesma pasta do executável
+  LstrINIPath := IncludeTrailingPathDelimiter(LstrExePath) + AnomeArquivoIni;
+
+  try
+    // Crie o arquivo INI
+    LIniFile := TIniFile.Create(LstrINIPath);
+    LstrSection := ''; // Inicializa a seção como vazia
+
+    for I := 0 to Memo.Lines.Count - 1 do
+    begin
+      LstrLinha := Memo.Lines[I];
+
+      // Verifique se a linha não está em branco
+      if Trim(LstrLinha) <> '' then
+      begin
+        // Verifique se a linha é uma seção
+        if (LstrLinha[1] = '[') and (LstrLinha[Length(LstrLinha)] = ']') then
+        begin
+          // Extrai o nome da seção
+          LstrSection := Copy(LstrLinha, 2, Length(LstrLinha) - 2);
+        end
+        else
+        begin
+          // Se não for uma seção, divide a linha em chave e valor
+          if Pos('=', LstrLinha) > 0 then
+          begin
+            LstrKey := Trim(Copy(LstrLinha, 1, Pos('=', LstrLinha) - 1));
+            LstrValue := Trim(Copy(LstrLinha, Pos('=', LstrLinha) + 1, Length(LstrLinha)));
+            // Salva a chave e o valor na seção atual
+            LIniFile.WriteString(LstrSection, LstrKey, LstrValue);
+          end;
+        end;
+      end;
+    end;
+
+    Result := True; // Arquivo INI foi criado com sucesso
+  except
+    Result := False; // Ocorreu um erro ao criar o arquivo INI
+  end;
+
+  if Assigned(LIniFile) then
+    LIniFile.Free;
+end;
+
+function fExcluirArquivoIniNaPastaDaDLL(const NomeArquivoIni: string): Boolean; stdcall;
+var
+  CaminhoDLL, CaminhoArquivo: string;
+begin
+  // Obtenha o caminho da pasta onde a DLL está localizada
+  SetLength(CaminhoDLL, MAX_PATH);
+  if GetModuleFileName(HInstance, PChar(CaminhoDLL), Length(CaminhoDLL)) > 0 then
+  begin
+    CaminhoDLL := ExtractFilePath(CaminhoDLL);
+
+    // Combine o caminho da DLL com o nome do arquivo INI para obter o caminho completo
+    CaminhoArquivo := IncludeTrailingPathDelimiter(CaminhoDLL) + NomeArquivoIni;
+
+    try
+      // Verifique se o arquivo INI existe
+      if FileExists(CaminhoArquivo) then
+      begin
+        // Tente excluir o arquivo INI
+        if DeleteFile(PWideChar(CaminhoArquivo)) then
+          Result := True // Arquivo INI foi excluído com sucesso
+        else
+          Result := False; // Falha ao excluir o arquivo INI
+      end
+      else
+      begin
+        Result := False; // Arquivo INI não existe na pasta
+      end;
+    except
+      // Em caso de erro ao excluir o arquivo
+      Result := False;
+    end;
+  end
+  else
+  begin
+    Result := False; // Não foi possível obter o caminho da DLL
+  end;
+end;
+
+function fExcluirSecaoIni(AstrNomeArquivo, AstrNomeSecao: String): Boolean; stdcall;
+var
+  IniFile: TIniFile;
+  CaminhoDLL, CaminhoArquivo: string;
+begin
+  IniFile := nil;
+  Result := False;
+
+  // Obtenha o caminho da pasta onde a DLL está localizada
+  SetLength(CaminhoDLL, MAX_PATH);
+  if GetModuleFileName(HInstance, PChar(CaminhoDLL), Length(CaminhoDLL)) > 0 then
+  begin
+    CaminhoDLL := ExtractFilePath(CaminhoDLL);
+
+    // Combine o caminho da DLL com o nome do arquivo INI para obter o caminho completo
+    CaminhoArquivo := IncludeTrailingPathDelimiter(CaminhoDLL) + AstrNomeArquivo;
+
+    // Crie uma instância de TIniFile
+    IniFile := TIniFile.Create(CaminhoArquivo);
+
+    // Verifique se o arquivo INI existe
+    if FileExists(CaminhoArquivo) then
+    begin
+      // Tente excluir a seção
+      try
+        IniFile.EraseSection(AstrNomeSecao);
+        Result := True;
+      except
+        Result := False;
+        ShowMessage('Seção ' + AstrNomeSecao+' não existe!');
+      end;
+    end
+    else
+    begin
+      ShowMessage('Arquivo ' + AstrNomeArquivo + ' não existe no diretório da DLL');
+    end;
+  end
+  else
+  begin
+    ShowMessage('Não foi possível obter o caminho da DLL');
+  end;
+
+  if Assigned(IniFile) then
+    IniFile.Free;
+end;
+
+procedure pApagarPrimeiraSecaoIniEMemo(Memo: TMemo; LstrIniFile : String); stdcall;
+var
+  DllPath, IniFilePath: string;
+  IniFile: TIniFile;
+  Sections: TStrings;
+begin
+  DllPath := fGetDllPath;
+  IniFilePath := DllPath + LstrIniFile;
+
+  if FileExists(IniFilePath) then
+  begin
+    IniFile := TIniFile.Create(IniFilePath);
+    Sections := TStringList.Create;
+    try
+      IniFile.ReadSections(Sections);
+      if Sections.Count > 0 then
+      begin
+        // Apaga a primeira seção do arquivo INI
+        IniFile.EraseSection(Sections[0]);
+        Memo.Clear;
+        Sections.Delete(0);
+      end;
+    finally
+      IniFile.Free;
+      Sections.Free;
+    end;
+  end
+  else
+  begin
+    ShowMessage('Não existe conexões definidas!');
+  end;
+end;
+
+procedure pMemoKeyPress(Memo : TMemo; Sender: TObject; var Key: Char); stdcall;
+var
+  LstrTextoAntesDoIgual: string;
+begin
+  // Obter o texto antes do caractere '='
+  LstrTextoAntesDoIgual := Copy(Memo.Text, 1, Memo.SelStart);
+
+  // Verifica se o caractere pressionado não é alfanumérico ou espaço, exceto o Backspace
+  if (not CharInSet(Key, ['A'..'Z', 'a'..'z', '0'..'9', ' ', '-', '_', '.', ',', ':'])) and (Key <> #8) then
+  begin
+    // Bloqueia a entrada de caracteres não alfanuméricos, exceto o Backspace
+    Key := #0;
+  end
+  else if Pos('=', LstrTextoAntesDoIgual) > 0 then
+  begin
+    // Se o '=' estiver presente no texto antes do cursor, permite a entrada
+  end
+  else
+  begin
+    // Bloqueia a entrada antes do caractere '='
+    Key := #0;
+  end;
+end;
+
+exports
+  fContarSecoesNoMemo,
+  fSecaoExisteNoMemo,
+  pAdicionarSecaoNoMemo,
+  fCriarArquivoIniDoMemo,
+  fParametrosEstaoCompletos,
+  fExcluirArquivoIniNaPastaDaDLL,
+  fExcluirSecaoIni,
+  fGetDllPath,
+  pApagarPrimeiraSecaoIniEMemo,
+  pMemoKeyPress;
+
+begin
+end.
