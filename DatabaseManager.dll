@@ -1,6 +1,19 @@
-library DatabaseManager;
+library DatabaseTeste;
 
+{ Important note about DLL memory management: ShareMem must be the
+  first unit in your library's USES clause AND your project's (select
+  Project-View Source) USES clause if your DLL exports any procedures or
+  functions that pass strings as parameters or function results. This
+  applies to all strings passed to and from your DLL--even those that
+  are nested in records and classes. ShareMem is the interface unit to
+  the BORLNDMM.DLL shared memory manager, which must be deployed along
+  with your DLL. To avoid using BORLNDMM.DLL, pass string information
+  using PChar or ShortString parameters.
 
+  Important note about VCL usage: when this DLL will be implicitly
+  loaded and this DLL uses TWicImage / TImageCollection created in
+  any unit initialization section, then Vcl.WicImageInit must be
+  included into your library's USES clause. }
 
 uses
   SysUtils,
@@ -35,16 +48,20 @@ var
   I: Integer;
   LConnection: TFDConnection;
   LSectionName, LServer, LDatabase, LUserName, LPassword, LPort: string;
-begin
+  LDllPath: string;
+ begin
   Result := TStringList.Create;
   LIniFile := nil;
   LSectionList := nil;
 
   try
-    if not FileExists(AstrIniFileName) then
+    // Obtenha o caminho da DLL (diretório do arquivo executável)
+    LDllPath := ExtractFilePath(ParamStr(0));
+
+    if not FileExists(LDllPath + AstrIniFileName) then
       raise Exception.Create('O arquivo INI especificado não existe.');
 
-    LIniFile := TIniFile.Create(AstrIniFileName);
+    LIniFile := TIniFile.Create(LDllPath + AstrIniFileName);
     LSectionList := TStringList.Create;
     LIniFile.ReadSections(LSectionList);
 
@@ -58,16 +75,14 @@ begin
         LPassword := LIniFile.ReadString(LSectionName, 'Password', '');
         LPort := LIniFile.ReadString(LSectionName, 'Port', '');
       except
-        ShowMessage('Verifique se as chaves estão corretas na seção '+LSectionName+' e teste novamente!');
-        Exit;
+        ShowMessage('Verifique se as chaves estão corretas na seção ' + LSectionName + ' e teste novamente!');
       end;
 
-
       LConnection := TFDConnection.Create(nil);
-      LConnection.Params.DriverID := 'MySQL';
       LConnection.Params.Database := LDatabase;
       LConnection.Params.UserName := LUserName;
       LConnection.Params.Password := LPassword;
+      LConnection.Params.Add('DriverID=' + 'MySQL');
       LConnection.Params.Add('Server=' + LServer);
       LConnection.Params.Add('Port=' + LPort);
 
@@ -78,10 +93,8 @@ begin
       except
         on E: Exception do
         begin
-          ShowMessage('Erro ao criar conexão ' + LSectionName + ': ' + E.Message);
+          ShowMessage('Não foi possivel estabelecer a conexão ' + LSectionName + ': ' + E.Message + 'Ajuste os parametros e tente novamente');
           LConnection.Free;
-          FreeAndNil(Result);
-          Exit; // Saia da função em caso de erro.
         end;
       end;
     end;
