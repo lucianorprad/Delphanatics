@@ -19,8 +19,11 @@ uses
   SysUtils,
   Classes,
   IniFiles,
-  FireDAC.Comp.Client,
+  Winapi.Windows,
+  Winapi.Messages,
+  System.Variants,
   Vcl.Dialogs,
+  Vcl.StdCtrls,
   FireDAC.Stan.Intf,
   FireDAC.Stan.Option,
   FireDAC.Stan.Error,
@@ -30,18 +33,28 @@ uses
   FireDAC.Stan.Pool,
   FireDAC.Stan.Async,
   FireDAC.Phys,
-  FireDAC.Phys.MySQL,
-  FireDAC.Phys.MySQLDef,
   FireDAC.VCLUI.Wait,
+  FireDAC.Comp.Client,
+  FireDAC.Stan.Param,
+  FireDAC.DatS,
+  FireDAC.DApt.Intf,
+  FireDAC.DApt,
+  FireDAC.Comp.DataSet,
+  Vcl.Grids,
+  Vcl.DBGrids,
+  FireDAC.Phys.MySQLDef,
+  FireDAC.Phys.MySQL,
   Data.DB,
-  Vcl.Controls;
+  Vcl.Controls,
+  System.Generics.Collections;
 
 {$R *.res}
 
 
 // Processa o arquivo.ini Cria o TFDConnection a partir dos parametros passados
 // e insere a conexao na TStringList
-function fCreateConnectionFromIniFile(const AstrIniFileName: String): TStringList; stdcall;
+
+function fCreateConnectionFromIniFile(const AstrIniFileName: String): TObjectList<TFDConnection>; stdcall;
 var
   LIniFile: TIniFile;
   LSectionList: TStringList;
@@ -49,14 +62,21 @@ var
   LConnection: TFDConnection;
   LSectionName, LServer, LDatabase, LUserName, LPassword, LPort: string;
   LDllPath: string;
- begin
-  Result := TStringList.Create;
+  LDriver: TFDPhysMySQLDriverLink;
+begin
+  Result := TObjectList<TFDConnection>.Create(True); // Crie uma instância de TObjectList<TFDConnection>
   LIniFile := nil;
   LSectionList := nil;
-
+  LDriver := TFDPhysMySQLDriverLink.Create(nil);
   try
     // Obtenha o caminho da DLL (diretório do arquivo executável)
     LDllPath := ExtractFilePath(ParamStr(0));
+
+    if not FileExists(LDllPath + 'libmysql.dll') then
+      raise Exception.Create('libmysql.dll não encontrado, colocar o arquivo na pasta do  executavel');
+
+    LDriver.DriverID := 'MySQL';
+    LDriver.VendorLib := LDllPath + 'libmysql.dll';
 
     if not FileExists(LDllPath + AstrIniFileName) then
       raise Exception.Create('O arquivo INI especificado não existe.');
@@ -76,9 +96,14 @@ var
         LPort := LIniFile.ReadString(LSectionName, 'Port', '');
       except
         ShowMessage('Verifique se as chaves estão corretas na seção ' + LSectionName + ' e teste novamente!');
+        FreeAndNil(LSectionList);
+        FreeAndNil(LDriver);
       end;
 
       LConnection := TFDConnection.Create(nil);
+      LConnection.Name := 'Connection_' + LSectionName;
+      LConnection.DriverName := 'MySQL';
+      LConnection.Params.DriverID := 'MySQL';
       LConnection.Params.Database := LDatabase;
       LConnection.Params.UserName := LUserName;
       LConnection.Params.Password := LPassword;
@@ -88,12 +113,12 @@ var
 
       try
         LConnection.Open;
-        Result.AddObject(LSectionName, LConnection);
+        Result.Add(LConnection); // Adicione a conexão à lista
         ShowMessage('Conexão ' + LSectionName + ' criada com sucesso!');
       except
         on E: Exception do
         begin
-          ShowMessage('Não foi possivel estabelecer a conexão ' + LSectionName + ': ' + E.Message + 'Ajuste os parametros e tente novamente');
+          ShowMessage('Não foi possível estabelecer a conexão ' + LSectionName + ': ' + E.Message + 'Ajuste os parâmetros e tente novamente');
           LConnection.Free;
         end;
       end;
@@ -101,6 +126,7 @@ var
   finally
     FreeAndNil(LIniFile);
     FreeAndNil(LSectionList);
+    FreeAndNil(LDriver);
   end;
 end;
 
@@ -108,7 +134,18 @@ end;
 procedure pActivateConnections(AconnectionList: TStringList); stdcall;
 var
   I: Integer;
+  LDLLPath : String;
+  LDriver : TFDPhysMySQLDriverLink;
 begin
+  LDllPath := ExtractFilePath(ParamStr(0));
+
+  if not FileExists(LDllPath + 'libmysql.dll') then
+      raise Exception.Create('libmysql.dll não encontrado, colocar o arquivo na pasta do  executavel');
+
+  LDriver := TFDPhysMySQLDriverLink.Create(nil);
+  LDriver.DriverID := 'MySQL';
+  LDriver.VendorLib := LDllPath + 'libmysql.dll';
+
   for I := 0 to AconnectionList.Count - 1 do
   begin
     if AconnectionList.Objects[I] is TFDConnection then
