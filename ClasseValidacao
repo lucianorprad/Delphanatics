@@ -1,0 +1,36 @@
+unit untValidacoes;
+
+interface
+uses Dialogs, Vcl.StdCtrls;
+
+type
+  TValidacoes = class
+  public
+    class procedure pValidaCfgsis(Checkbox:TCheckbox;
+     var CFG_CIEEST, CFG_REDEST, CFG_CIELNK:string);
+ end;
+
+implementation
+
+{ TValidacoes }
+
+// Uses Dialogs, Vcl.StdCtrls;
+
+class procedure TValidacoes.pValidaCfgsis(checkbox:TCheckBox;
+ var CFG_CIEEST,CFG_REDEST, CFG_CIELNK: string);
+begin
+ if Checkbox.checked then
+ begin
+   CFG_CIEEST:= InputBox('Preencher CFG_CIEEST','Informe o valor para a CFG_CIEEST:','');
+   CFG_REDEST:= InputBox('Preencher CFG_REDEST','Informe o valor para a CFG_REDEST:','');
+   CFG_CIELNK:= InputBox('Preencher CFG_CIELNK','Informe o valor para a CFG_CIELNK:','');
+
+   if(CFG_CIEEST = '') or (CFG_REDEST = '') or (CFG_CIELNK = '') then
+    begin
+      ShowMessage ('Você deve informar todas as configurações!');
+      checkbox.checked:= false;
+    end;
+ end;
+end;
+
+end.
