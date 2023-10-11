@@ -1,0 +1,125 @@
+unit untClasseDatabaseManager;
+
+interface
+uses
+  System.Generics.Collections,
+  FireDAC.Stan.Intf,
+  FireDAC.Stan.Option,
+  FireDAC.Stan.Error,
+  FireDAC.UI.Intf,
+  FireDAC.Phys.Intf,
+  FireDAC.Stan.Def,
+  FireDAC.Stan.Pool,
+  FireDAC.Stan.Async,
+  FireDAC.Phys,
+  FireDAC.VCLUI.Wait,
+  FireDAC.Comp.Client,
+  FireDAC.Stan.Param,
+  FireDAC.DatS,
+  FireDAC.DApt.Intf,
+  FireDAC.DApt,
+  FireDAC.Comp.DataSet,
+  FireDAC.Phys.MySQLDef,
+  FireDAC.Phys.MySQL;
+
+{Classe para gerenciar conexões}
+{Obs: Para utilização da classe é necessario importar todas as uses a cima}
+type
+  TDatabaseManager = class
+  public
+    function fCreateConnectionFromIniFile(const AstrIniFileName: String): TObjectList<TFDConnection>;
+  end;
+
+implementation
+
+uses
+  Classes, SysUtils, Windows, Dialogs, IniFiles;
+
+{ TDatabaseManager }
+
+{Função recebe como parametro o arquivo.ini, itera sob todas as seções do arquivo criando conexões com os parametros passados
+e retornando uma Lista de TFDConnection's}
+function TDatabaseManager.fCreateConnectionFromIniFile(
+  const AstrIniFileName: String): TObjectList<TFDConnection>;
+var
+  LIniFile: TIniFile;
+  LSectionList: TStringList;
+  I: Integer;
+  LConnection: TFDConnection;
+  LSectionName, LServer, LDatabase, LUserName, LPassword, LPort: string;
+  LDllPath: string;
+  LDriver: TFDPhysMySQLDriverLink;
+begin
+  Result := TObjectList<TFDConnection>.Create(True); // Crie uma instância de TObjectList<TFDConnection>
+  LIniFile := nil;
+  LSectionList := nil;
+  LDriver := TFDPhysMySQLDriverLink.Create(nil);
+  try
+    // Obtenha o caminho da DLL (diretório do arquivo executável)
+    LDllPath := ExtractFilePath(ParamStr(0));
+    LDriver.DriverID := 'MySQL';
+    LDriver.VendorLib := LDllPath + 'libmysql.dll';
+
+    // verifica se o libmysql.dll esta no diretório do exe
+    if not FileExists(LDllPath + 'libmysql.dll') then
+      raise Exception.Create('libmysql.dll não encontrado, colocar o arquivo na pasta do  executavel');
+
+    // verifica se o IniFile esta no diretório do exe
+    if not FileExists(LDllPath + AstrIniFileName) then
+      raise Exception.Create('O arquivo INI especificado não existe.');
+
+    LIniFile := TIniFile.Create(LDllPath + AstrIniFileName);
+    LSectionList := TStringList.Create;
+    LIniFile.ReadSections(LSectionList);
+
+    // iterando sobre todas as seções e passando os parametros para as variaveis
+    for I := 0 to LSectionList.Count - 1 do
+    begin
+      try
+        LSectionName := LSectionList[I];
+        LServer := LIniFile.ReadString(LSectionName, 'Server', '');
+        LDatabase := LIniFile.ReadString(LSectionName, 'DataBase', '');
+        LUserName := LIniFile.ReadString(LSectionName, 'UserName', '');
+        LPassword := LIniFile.ReadString(LSectionName, 'Password', '');
+        LPort := LIniFile.ReadString(LSectionName, 'Port', '');
+      except
+        ShowMessage('Verifique se as chaves estão corretas na seção ' + LSectionName + ' e teste novamente!');
+        FreeAndNil(LSectionList);
+        FreeAndNil(LDriver);
+        FreeAndNil(LIniFile);
+      end;
+
+      // passando os parametros de criação da conexão
+      LConnection := TFDConnection.Create(nil);
+      LConnection.Name := 'Connection_' + LSectionName;
+      LConnection.DriverName := 'MySQL';
+      LConnection.Params.DriverID := 'MySQL';
+      LConnection.Params.Database := LDatabase;
+      LConnection.Params.UserName := LUserName;
+      LConnection.Params.Password := LPassword;
+      LConnection.Params.Add('DriverID=' + 'MySQL');
+      LConnection.Params.Add('Server=' + LServer);
+      LConnection.Params.Add('Port=' + LPort);
+
+      // testando conexão
+      try
+        LConnection.Open;
+        Result.Add(LConnection); // Adicione a conexão à lista
+        ShowMessage('Conexão ' + LSectionName + ' criada com sucesso!');
+      except
+        on E: Exception do
+        begin
+          ShowMessage('Não foi possível estabelecer a conexão ' + LSectionName + ': ' + E.Message + 'Ajuste os parâmetros e tente novamente');
+          LConnection.Free;
+          FreeAndNil(LDriver);
+          FreeAndNil(LIniFile);
+        end;
+      end;
+    end;
+  finally
+    FreeAndNil(LIniFile);
+    FreeAndNil(LSectionList);
+  end;
+end;
+
+end.
