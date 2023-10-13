@@ -1,6 +1,5 @@
 library MemoManager;
 
-// nessa dll temos algumas funções para tratar o componete TMemo, onde vai ser inserido os parametros para conexão com o banco de dados
 
 uses
   SysUtils,
@@ -69,6 +68,10 @@ begin
   // Pergunta ao usuario o nome da nova seção
   repeat
     LstrNomeSecao := inputbox('Nova Seção', 'Digite o nome da seção:', '');
+    if LstrNomeSecao.IsEmpty then
+    begin
+      exit
+    end;
     // verifica se o nome da seção ja existe
     if fSecaoExisteNoMemo(Memo, LstrNomeSecao) = True then
     begin
@@ -113,7 +116,7 @@ begin
         end
         else if LstrValor = '' then
         begin
-          CamposEmFalta.Add(Copy(LstrLinha, 1, Pos('=', LstrLinha) - 1));
+          Result.Add(Copy(LstrLinha, 1, Pos('=', LstrLinha) - 1));
         end;
       end;
     end;
@@ -322,6 +325,62 @@ begin
   end;
 end;
 
+// funcão verifica se o arquivo existe e carrega no TMemo
+function fCarregarSectionsNoMemo(AstrFileName : string; Memo : TMemo): Boolean; stdcall;
+var
+  LIniFile: TIniFile;
+  LSectionList, LValues, LChaves: TStringList;
+  LSection, LChave, LValor: string;
+  I: Integer;
+  I2: Integer;
+  LDLLPath : String;
+  LIniFilePath: String;
+begin
+  LDLLPath := fGetDllPath;
+  LIniFilePath := LDLLPath+AstrFileName;
+  Result := False;
+
+  if FileExists(LIniFilePath) then
+  begin
+    LIniFile := TIniFile.Create(LIniFilePath);
+    LSectionList := TStringList.Create;
+    LValues := TStringList.Create;
+    LIniFile.ReadSections(LSectionList);
+    LChaves := TStringList.Create;;
+  try
+    for I := 0 to LSectionList.Count -1 do
+    begin
+      LSection := LSectionList[I];
+      Memo.Lines.Add('[' + LSection + ']');
+      try
+        LIniFile.ReadSection(LSection, LChaves);
+
+        for I2 := 0 to LChaves.Count - 1 do
+        begin
+          LChave := LChaves[I2];
+          LValor := LIniFile.ReadString(LSection, LChave, '');
+          Memo.Lines.Add(LChave + '=' + LValor)
+        end;
+      Result := True;
+      except
+        on E: Exception do
+        begin
+          ShowMessage('erro ao carregar arquivo ini' + E.Message);
+        end;
+      end;
+    end;
+  finally
+    LIniFile.Free;
+    LSectionList.Free;
+    LValues.Free;
+  end;
+  end
+  else
+  begin
+    Result := False;
+  end;
+end;
+
 exports
   fContarSecoesNoMemo,
   fSecaoExisteNoMemo,
@@ -332,7 +391,8 @@ exports
   fExcluirSecaoIni,
   fGetDllPath,
   pApagarPrimeiraSecaoIniEMemo,
-  pMemoKeyPress;
+  pMemoKeyPress,
+  fCarregarSectionsNoMemo;
 
 begin
 end.
