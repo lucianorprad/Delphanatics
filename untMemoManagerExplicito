@@ -1,0 +1,89 @@
+unit untMemoManagerExplicito;
+
+interface
+uses Vcl.StdCtrls, Classes;
+
+type
+  TFuncContarSecoesNoMemo = function(Memo: TMemo): Integer; stdcall;
+  TFuncSecaoExisteNoMemo = function(Memo: TMemo; const AstrNomeSecao: string): Boolean; stdcall;
+  TProcAdicionarSecaoNoMemo = procedure(Memo: TMemo; AIntMaximoSecoes: Integer); stdcall;
+  TFuncCriarArquivoIniDoMemo = function(const Memo: TMemo; const AnomeArquivoIni: string): Boolean; stdcall;
+  TFuncParametrosEstaoCompletos = function(const Memo: TMemo): TStringList; stdcall;
+  TFuncExcluirArquivoIniNaPastaDaDLL = function(const NomeArquivoIni: string): Boolean; stdcall;
+  TFuncExcluirSecaoIni = function(AstrNomeArquivo, AstrNomeSecao: String): Boolean; stdcall;
+  TFuncGetDllPath = function: string; stdcall;
+  TProcApagarPrimeiraSecaoIniEMemo = procedure(Memo: TMemo; LstrIniFile : String); stdcall;
+  TProcMemoKeyPress = procedure(Memo : TMemo; Sender: TObject; var Key: Char); stdcall;
+  TFuncCarregarSectionsNoMemo = function(AstrFileName : string; Memo : TMemo): Boolean; stdcall;
+
+function GetFunctionPointer(const AstrDLLName, AstrFunctionName: string): Pointer;
+procedure LoadDLLFunctions;
+
+var
+  FuncContarSecoesNoMemo: TFuncContarSecoesNoMemo;
+  FuncSecaoExisteNoMemo: TFuncSecaoExisteNoMemo;
+  ProcAdicionarSecaoNoMemo: TProcAdicionarSecaoNoMemo;
+  FuncCriarArquivoIniDoMemo: TFuncCriarArquivoIniDoMemo;
+  FuncParametrosEstaoCompletos: TFuncParametrosEstaoCompletos;
+  FuncExcluirArquivoIniNaPastaDaDLL : TFuncExcluirArquivoIniNaPastaDaDLL;
+  FuncExcluirSecaoIni : TFuncExcluirSecaoIni;
+  FuncGetDllPath : TFuncGetDllPath;
+  ProcApagarPrimeiraSecaoIniEMemo : TProcApagarPrimeiraSecaoIniEMemo;
+  ProcMemoKeyPress : TProcMemoKeyPress;
+  FuncCarregarSectionsNoMemo : TFuncCarregarSectionsNoMemo;
+implementation
+uses SysUtils, Windows;
+
+var
+  DLLHandle: THandle;
+
+//retorna a função atraves dos parametros passados
+function GetFunctionPointer(const AstrDLLName, AstrFunctionName: string): Pointer;
+begin
+  Result := GetProcAddress(DLLHandle, PChar(AstrFunctionName));
+  if not Assigned(Result) then
+    raise Exception.Create('Função não encontrada na DLL: ' + AstrFunctionName);
+end;
+
+// identifica o caminho da dll e carrega
+function LoadDLLInCurrentDir(const DLLName: string): HMODULE;
+var
+  DLLPath: string;
+begin
+  DLLPath := ExtractFilePath(ParamStr(0)) + DLLName;
+  Result := LoadLibrary(PChar(DLLPath));
+end;
+
+// atribui as funções da dll as variaveis definidas anteriormente
+procedure LoadDLLFunctions;
+begin
+  DLLHandle := LoadDLLInCurrentDir('MemoManager.dll');
+
+  if DLLHandle <> 0 then
+  begin
+    @FuncContarSecoesNoMemo := GetFunctionPointer('MemoManager.dll', 'fContarSecoesNoMemo');
+    @FuncSecaoExisteNoMemo := GetFunctionPointer('MemoManager.dll', 'fSecaoExisteNoMemo');
+    @ProcAdicionarSecaoNoMemo := GetFunctionPointer('MemoManager.dll', 'pAdicionarSecaoNoMemo');
+    @FuncCriarArquivoIniDoMemo := GetFunctionPointer('MemoManager.dll', 'fCriarArquivoIniDoMemo');
+    @FuncParametrosEstaoCompletos := GetFunctionPointer('MemoManager.dll', 'fParametrosEstaoCompletos');
+    @FuncExcluirArquivoIniNaPastaDaDLL := GetFunctionPointer('MemoManager.dll', 'fExcluirArquivoIniNaPastaDaDLL');
+    @FuncExcluirSecaoIni := GetFunctionPointer('MemoManager.dll', 'fExcluirSecaoIni');
+    @FuncGetDllPath := GetFunctionPointer('MemoManager.dll', 'fGetDllPath');
+    @ProcApagarPrimeiraSecaoIniEMemo := GetFunctionPointer('MemoManager.dll', 'pApagarPrimeiraSecaoIniEMemo');
+    @ProcMemoKeyPress := GetFunctionPointer('MemoManager.dll', 'pMemoKeyPress');
+    @FuncCarregarSectionsNoMemo := GetFunctionPointer('MemoManager.dll', 'fCarregarSectionsNoMemo');
+  end
+  else
+    raise Exception.Create('Não foi possível carregar a DLL.');
+end;
+
+// chama a procedure LoadDLLFunctions ao iniciar 
+initialization
+  LoadDLLFunctions;
+
+// desaloca memoria ao finalizar
+finalization
+  if DLLHandle <> 0 then
+    FreeLibrary(DLLHandle);
+
+end.
