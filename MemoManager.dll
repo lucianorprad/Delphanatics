@@ -22,6 +22,7 @@ begin
   Result := ExtractFilePath(Result);
 end;
 
+// faz um looping sobre todas as seções do opcoes.ini e incrementa +1 no resultado
 function fContarSecoesNoMemo(Memo : TMemo): Integer; stdcall;
 var
   I : Integer;
@@ -53,7 +54,7 @@ begin
 end;
 
 
-
+// solicita o nome da secão e adiciona os campos no TMemo
 procedure pAdicionarSecaoNoMemo(Memo : TMemo; AintMaximoSecoes : integer); stdcall;
 var
   LstrNomeSecao : String;
@@ -91,6 +92,7 @@ begin
   until LstrNomeSecao = '';
 end;
 
+// faz um looping verificando todos os digitos apos o = em cada linha do TMemo e retorna as chaves que estão sem valor definido após o =
 function fParametrosEstaoCompletos(const Memo: TMemo): TStringList; stdcall;
 var
   I: Integer;
@@ -128,6 +130,7 @@ begin
   end;
 end;
 
+// identifica seção, chave e valores definidos no TMemo e cria  um arquivo ini
 function fCriarArquivoIniDoMemo(const Memo: TMemo; const AnomeArquivoIni: string): Boolean; stdcall;
 var
   LIniFile: TIniFile;
@@ -138,7 +141,7 @@ begin
   LIniFile := nil; // Inicializa a variável como nil
 
   // Obtenha o caminho da pasta onde o executável principal está localizado
-  LstrExePath := ExtractFilePath(ParamStr(0));
+  LstrExePath := fGetDllPath;
 
   // Construa o caminho completo para o arquivo INI na mesma pasta do executável
   LstrINIPath := IncludeTrailingPathDelimiter(LstrExePath) + AnomeArquivoIni;
@@ -184,6 +187,7 @@ begin
     LIniFile.Free;
 end;
 
+// identifica o caminho da dll, apaga o arquivo.ini passado como parametro e retorna um Boolean para indentificar que o processo foi realizado
 function fExcluirArquivoIniNaPastaDaDLL(const NomeArquivoIni: string): Boolean; stdcall;
 var
   CaminhoDLL, CaminhoArquivo: string;
@@ -222,6 +226,7 @@ begin
   end;
 end;
 
+// solicita o nome da seção e exclui do arquivo.ini informado no parametro
 function fExcluirSecaoIni(AstrNomeArquivo, AstrNomeSecao: String): Boolean; stdcall;
 var
   IniFile: TIniFile;
@@ -268,6 +273,7 @@ begin
     IniFile.Free;
 end;
 
+// apaga a primeira seção definida no arquivo.ini
 procedure pApagarPrimeiraSecaoIniEMemo(Memo: TMemo; LstrIniFile : String); stdcall;
 var
   DllPath, IniFilePath: string;
@@ -301,6 +307,7 @@ begin
   end;
 end;
 
+// Permite a digitação apenas após o = de cada chave
 procedure pMemoKeyPress(Memo : TMemo; Sender: TObject; var Key: Char); stdcall;
 var
   LstrTextoAntesDoIgual: string;
